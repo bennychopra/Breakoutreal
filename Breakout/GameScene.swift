@@ -153,7 +153,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         addChild(brick)
         bricks.append(brick)
     }
-    //jkhbnhdfgbvdertgvfrdfghjbnfghhj
+    //jkhbnhdfgbvdertg
     func makeLoseZone () {
         loseZone = SKSpriteNode(color: .red, size: CGSize(width: frame.width, height: 50))
         loseZone.position = CGPoint(x: frame.midX, y: frame.minY + 25)
