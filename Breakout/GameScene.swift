@@ -1,5 +1,11 @@
 import SpriteKit
 import GameplayKit
+extension CGVector {
+    static func * (vector: CGVector, scalar: CGFloat) -> CGVector {
+        return CGVector(dx: vector.dx * scalar, dy: vector.dy * scalar)
+    }
+}
+
 class GameScene: SKScene, SKPhysicsContactDelegate {
     var ball = SKShapeNode()
     var paddle = SKSpriteNode()
@@ -12,8 +18,11 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     var score = 0
     var lives = 3
     var removedBricks = 0
-    
+    var stickyEnabled = false
+    var ballIsStuck = false
+    var slowMotionEnabled = false
     func resetGame() {
+   
         
         makeBall()
         makePaddle()
@@ -31,6 +40,11 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         for touch in touches {
             let location = touch.location (in: self)
+            if ballIsStuck {
+                ballIsStuck = false
+                kickBall()
+                return
+            }
             if playingGame {
                 paddle.position.x = location.x
             }
@@ -57,24 +71,48 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         }
     }
     func didBegin(_ contact: SKPhysicsContact) {
+        guard let nodeA = contact.bodyA.node, let nodeB = contact.bodyB.node else { return }
+
+            let names = [nodeA.name, nodeB.name]
+            if names.contains("ball") && names.contains("paddle") {
+                if stickyEnabled {
+                    ball.physicsBody?.velocity = .zero
+                    ball.position.y = paddle.position.y + 20
+                    ballIsStuck = true
+                    return
+                }
+            }
         
         for brick in bricks {
             if contact.bodyA.node == brick ||
                 contact.bodyB.node == brick {
                 score += 1
-                
-                ball.physicsBody!.velocity.dx *= CGFloat (1.02)
-                ball.physicsBody!.velocity.dy *= CGFloat(1.02)
+
+                if let velocity = ball.physicsBody?.velocity {
+                    ball.physicsBody?.velocity = velocity * 1.02
+                }
                 updateLabels()
+
                 if brick.color == .blue {
                     brick.color = .orange
                 }
                 else if brick.color == .orange {
                     brick.color = .green
                 }
-                else { 
+                else {
                     brick.removeFromParent ()
                     removedBricks += 1
+                    if removedBricks == 3 {
+                        stickyEnabled = true
+                        run(SKAction.wait(forDuration: 10)) { [weak self] in
+                            self?.stickyEnabled = false
+                        }
+                    }
+                    
+                    
+                    if removedBricks == 6 {
+                        activateSlowMotion(duration: 5)
+                    }
                     if removedBricks == bricks.count {
                         gameOver(winner: true)
                     }
@@ -220,5 +258,23 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         if abs(ball.physicsBody!.velocity.dy) < 100 {
             ball.physicsBody?.applyImpulse(CGVector(dx: 0, dy: Int.random(in: -3...3)))
         }
+        if ballIsStuck {
+                ball.position.x = paddle.position.x
+                ball.position.y = paddle.position.y + 20
+            }
+    }
+    func activateSlowMotion(duration: TimeInterval) { // ✅
+        guard !slowMotionEnabled else { return } // ✅
+        slowMotionEnabled = true // ✅
+
+        let currentVelocity = ball.physicsBody?.velocity ?? .zero // ✅
+        ball.physicsBody?.velocity = currentVelocity * 0.5 // ✅ Slow down ball velocity // ✅
+
+        run(SKAction.wait(forDuration: duration)) { [weak self] in // ✅
+            guard let self = self else { return } // ✅
+            let restoredVelocity = self.ball.physicsBody?.velocity ?? .zero // ✅
+            self.ball.physicsBody?.velocity = restoredVelocity * 2.0 // ✅ Restore speed // ✅
+            self.slowMotionEnabled = false // ✅
+        } // ✅
     }
 }
